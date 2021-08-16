@@ -1,0 +1,10 @@
+{
+  "SSH Connection": {
+    "Host": "",
+    "User": ""
+  },
+  "Deployment": {
+    "Local Path": "",
+    "Server Path": ""
+  }
+}

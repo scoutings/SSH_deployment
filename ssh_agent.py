@@ -10,11 +10,10 @@ class ssh_agent():
     """
         This is the ssh_agent class. It is used to send commands to a given server via ssh.
     """
-    def __init__(self, host, username, password=None, verbose=False):
+    def __init__(self, host, username, verbose=False):
 
         self.host = host
         self.username = username
-        self.password = password
         self.verbose = verbose
 
         self._ssh_connect()
@@ -128,7 +127,7 @@ class ssh_agent():
             if self.verbose: print("\nSSH Connecting to: Host-{}, Username-{}".format(self.host, self.username))
             self.ssh = paramiko.SSHClient()
             self.ssh.load_system_host_keys()
-            self.ssh.connect(hostname=self.host, username=self.username, password=self.password)
+            self.ssh.connect(hostname=self.host, username=self.username)
             if self.verbose: print("Connected\n")
         except Exception as e:
             print("\n!!! ERROR: Unable to SSH connect; error message: [{}] !!!\n".format(e))
@@ -143,11 +142,11 @@ class ssh_agent():
         """
         print("{}: {}".format(self.host, msg), end=end)
 
-def main(host, username, password=None, verbose=False):
+def main(host, username, verbose=False):
     """
         This is currently only used for testing.
     """
-    ssh = ssh_agent(host=host, username=username, password=password, verbose=verbose)
+    ssh = ssh_agent(host=host, username=username, verbose=verbose)
     ssh.list_directory(args="-al")
     ssh.run_python("Desktop/hello.py", sudo=True)
     del ssh
@@ -157,9 +156,8 @@ if __name__ == "__main__":
 
     parser.add_argument('-H', '--host', dest='host', action='store', required=True, help='Host of SSH Server to connect to')
     parser.add_argument('-U', '--username', dest='username', action='store', required=True, help='Username used for SSH connection')
-    parser.add_argument('-p', '--password', dest='password', action='store', required=False, default=None, help='Password used for SSH Connection')
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', required=False, default=False, help='Turns on verbosity')
 
     args = parser.parse_args()
 
-    main(host=args.host, username=args.username, password=args.password, verbose=args.verbose)
+    main(host=args.host, username=args.username, verbose=args.verbose)
