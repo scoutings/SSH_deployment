@@ -4,7 +4,10 @@
 """
 
 import argparse
+import time
 import paramiko
+import os
+import stat
 
 class ssh_agent():
     """
@@ -16,7 +19,12 @@ class ssh_agent():
         self.username = username
         self.verbose = verbose
 
+        self.local_host = os.uname()[1]
+
+        self.ssh = None
         self._ssh_connect()
+        self.sftp = None
+        self._ssh_sftp_connect()
 
         # Will hold the three main file types on the ssh server.
         self.streams = {
@@ -25,11 +33,16 @@ class ssh_agent():
             "err": None
         }
 
+        print()
+
     def __del__(self):
         # Closes connection with SSh Server
+        if self.verbose: print("\nClosing SFTP Connection")
+        self.sftp.close()
+        if self.verbose: print("Closed")
         if self.verbose: print("\nClosing SHH Connection")
         self.ssh.close()
-        if self.verbose: print("Connection to {} closed.\n".format(self.host))
+        if self.verbose: print("Connection to {} closed.".format(self.host))
 
     def print_stdout(self):
         """
@@ -104,16 +117,61 @@ class ssh_agent():
 
             print()
 
+    def get_server_directory_structure(self, directory):
+        """
+        Todo
+        :param directory:
+        :return:
+        """
+        ret_val = {}
+
+        for element in self.sftp.listdir_attr(directory):
+            element_name = element.filename
+            if stat.S_ISDIR(element.st_mode):
+                ret_val[element_name] = self.get_server_directory_structure(directory="{}/{}".format(directory, element_name))
+            elif stat.S_ISREG(element.st_mode):
+                ret_val[element_name] = element.st_size
+            else:
+                print("!!! ERROR: Did not recognize [{}] element type in directory: [{}] !!!".format(element_name, directory))
+
+        return ret_val
+
+    def copy_file_to_server(self, local_file, server_path):
+        """
+        Todo
+        :param local_file:
+        :param server_path:
+        :return:
+        """
+        if self.verbose: print("\tCopying {} to {}".format(local_file, server_path))
+        file_name = os.path.split(local_file)[1]
+        self.sftp.put(local_file, "/tmp/{}".format(file_name))
+        self._run_command("sudo mv /tmp/{} {}/".format(file_name, server_path), get_pty=False)
+        # Todo temp fix for waiting to copy
+        # time.sleep(0.1)
+
+    def delete_file_from_server(self, file_path):
+        """
+        Todo
+        :param file_path:
+        :return:
+        """
+        if self.verbose: print("\tDeleting {}".format(file_path))
+        self._run_command("sudo rm -rf {}".format(file_path), get_pty=False)
+        # Todo temp fix for waiting to del
+        # time.sleep(0.1)
+
+
     # ////////////////////// Helpers ////////////////////// #
 
-    def _run_command(self, command):
+    def _run_command(self, command, get_pty=True):
         """
             This is a simple wrapper method around exec_command() that stores stdin, stdout, and stderr in the streams
             class variable.
 
             :param str command: Command to run
         """
-        stdin, stdout, stderr = self.ssh.exec_command(command, get_pty=True)
+        stdin, stdout, stderr = self.ssh.exec_command(command, get_pty=get_pty)
         self.streams["in"] = stdin
         self.streams["out"] = stdout
         self.streams["err"] = stderr
@@ -128,9 +186,21 @@ class ssh_agent():
             self.ssh = paramiko.SSHClient()
             self.ssh.load_system_host_keys()
             self.ssh.connect(hostname=self.host, username=self.username)
-            if self.verbose: print("Connected\n")
+            if self.verbose: print("Connected")
         except Exception as e:
-            print("\n!!! ERROR: Unable to SSH connect; error message: [{}] !!!\n".format(e))
+            print("!!! ERROR: Unable to SSH connect; error message: [{}] !!!".format(e))
+
+    def _ssh_sftp_connect(self):
+        """
+        Todo
+        :return:
+        """
+        try:
+            if self.verbose: print("\nSFTP Connecting")
+            self.sftp = self.ssh.open_sftp()
+            if self.verbose: print("Connected")
+        except Exception as e:
+            print("!!! ERROR: Unable to create an sftp connection; error message [{}] !!!".format(e))
 
     def _host_print(self, msg, end="\n"):
         """
