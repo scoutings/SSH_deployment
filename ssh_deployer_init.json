@@ -4,7 +4,8 @@
     "User": ""
   },
   "Deployment": {
-    "Local Path": "",
-    "Server Path": ""
+    "Local Repo Path": "",
+    "Server Repo Path": "",
+    "Ignored Files": []
   }
 }

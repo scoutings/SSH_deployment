@@ -8,27 +8,45 @@ import json
 import os
 import time
 
+from schema import Schema, And, Or, Use, Optional, SchemaError
+
 from ssh_agent import ssh_agent
+
+SSH_CONNECTION_CFG_GROUP = "SSH Connection"
+HOST_CFG_KEY = "Host"
+USER_CFG_KEY = "User"
+
+DEPLOYMENT_CFG_GROUP = "Deployment"
+LOCAL_REPO_PATH_CFG_KEY = "Local Repo Path"
+SERVER_REPO_PATH_CFG_KEY = "Server Repo Path"
+IGNORED_FILES_CFG_KEY = "Ignored Files"
+
+CFG_FILE_VALIDATION = Schema({
+    SSH_CONNECTION_CFG_GROUP: {
+        HOST_CFG_KEY: str,
+        USER_CFG_KEY: str
+    },
+    DEPLOYMENT_CFG_GROUP: {
+        LOCAL_REPO_PATH_CFG_KEY: str,
+        SERVER_REPO_PATH_CFG_KEY: str,
+        IGNORED_FILES_CFG_KEY: list
+    }
+})
 
 class ssh_deployer():
     """
         Todo
     """
-    def __init__(self, verbose=False):
-        self.verbose = verbose
+    def __init__(self, cfg_path, verbose=False):
 
-        f = open("ssh_deployer_init.json")
-        raw_init_json = json.load(f)
+        self.verbose = verbose
 
         self.ssh_host = None
         self.ssh_user = None
         self.deployment_local = None
         self.deployment_server = None
         self.ignore_files = None
-
-        self._parse_init_json(init_json=raw_init_json)
-
-        f.close()
+        self._parse_init_json(init_json_path=cfg_path)
 
         self.ssh_agent = ssh_agent(host=self.ssh_host, username=self.ssh_user, verbose=self.verbose)
 
@@ -191,31 +209,57 @@ class ssh_deployer():
 
         return ret_val
 
-    def _parse_init_json(self, init_json):
+    def _parse_init_json(self, init_json_path):
         """
-            Todo poor parsing should improve this asap
+            This method will use the Schema library to validate the CFG file being passed to the deployer. Once
+            validated the init file will be parsed to store the information in the file.
+
+            :param str init_json_path: Path to the init file to be parsed.
+
+            :return: True / False based on success
         """
+        ret_val = False
 
         if self.verbose: print("Parsing init:")
 
-        self.ssh_host = init_json["SSH Connection"]["Host"]
-        if self.verbose: print("\tHost: {}".format(self.ssh_host))
-        self.ssh_user = init_json["SSH Connection"]["User"]
-        if self.verbose: print("\tUser: {}".format(self.ssh_user))
+        try:
+            init_json_file = open(init_json_path)
+            init_json = json.load(init_json_file)
 
-        self.deployment_local = init_json["Deployment"]["Local Repo Path"]
-        if self.verbose: print("\tLocal repo path: {}".format(self.deployment_local))
-        self.deployment_server = init_json["Deployment"]["Server Path"]
-        if self.verbose: print("\tServer path: {}".format(self.deployment_server))
+            try:
 
-        self.ignore_files = init_json["Deployment"]["Ignored Files"]
-        if self.verbose: print("\tIgnored files: {}".format(self.ignore_files))
+                CFG_FILE_VALIDATION.validate(init_json)
 
-        if self.verbose: print("Done parsing init")
+                self.ssh_host = init_json[SSH_CONNECTION_CFG_GROUP][HOST_CFG_KEY]
+                if self.verbose: print("\t{}: {}".format(HOST_CFG_KEY, self.ssh_host))
+
+                self.ssh_user = init_json[SSH_CONNECTION_CFG_GROUP][USER_CFG_KEY]
+                if self.verbose: print("\t{}: {}".format(USER_CFG_KEY, self.ssh_user))
+
+                self.deployment_local = init_json[DEPLOYMENT_CFG_GROUP][LOCAL_REPO_PATH_CFG_KEY]
+                if self.verbose: print("\t{}: {}".format(LOCAL_REPO_PATH_CFG_KEY, self.deployment_local))
+
+                self.deployment_server = init_json[DEPLOYMENT_CFG_GROUP][SERVER_REPO_PATH_CFG_KEY]
+                if self.verbose: print("\t{}: {}".format(SERVER_REPO_PATH_CFG_KEY, self.deployment_server))
+
+                self.ignore_files = init_json[DEPLOYMENT_CFG_GROUP][IGNORED_FILES_CFG_KEY]
+                if self.verbose: print("\t{}: {}".format(IGNORED_FILES_CFG_KEY, self.ignore_files))
+
+                ret_val = True
+
+            except SchemaError as e:
+                print("!!! ERROR: CFG file not correct format; Schema Error: [{}] !!!".format(e))
+
+            init_json_file.close()
+
+        except Exception as e:
+            print("!!! ERROR: An error occurred when parsing init file [{}] !!!".format(e))
+
+        return ret_val
 
 
-def main(verbose=False):
-    ssh_dep = ssh_deployer(verbose=verbose)
+def main(cfg_path, verbose=False):
+    ssh_dep = ssh_deployer(cfg_path=cfg_path, verbose=verbose)
     ssh_dep.run()
     del ssh_dep
 
@@ -223,7 +267,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', required=False, default=False, help='Turns on verbosity')
+    parser.add_argument('-c', '--config_path', dest='cfg_path', action='store', required=True, help='Specify the path of the ssh_deployer_init.json file')
 
     args = parser.parse_args()
 
-    main(verbose=args.verbose)
+    main(cfg_path=args.cfg_path, verbose=args.verbose)
