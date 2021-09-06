@@ -186,6 +186,12 @@ class ssh_agent():
         """
 
         if self.verbose: print("\tCopying {} to {}".format(local_file, server_path))
+
+        server_path_exists = self.file_exists_on_server(file_path=server_path)
+
+        if not server_path_exists:
+            self._run_command(command="sudo mkdir {}".format(server_path), get_pty=False)
+
         file_name = os.path.split(local_file)[1]
         self.sftp.put(local_file, "/tmp/{}".format(file_name))
         self._run_command("sudo mv /tmp/{} {}/".format(file_name, server_path), get_pty=False)
@@ -198,6 +204,31 @@ class ssh_agent():
         """
         if self.verbose: print("\tDeleting {}".format(file_path))
         self._run_command("sudo rm -rf {}".format(file_path), get_pty=False)
+
+    def file_exists_on_server(self, file_path):
+        """
+        This method will check if the fle path given as a parameter exists on the ssh server. It will return T/F.
+
+        :param str file_path: The path to determine if it exists or not.
+
+        :return: T/F based on if the path exists or not.
+        """
+
+        ret_val = None
+
+        try:
+
+            self.sftp.stat(file_path)
+
+        except IOError as e:
+
+            ret_val = False
+
+        else:
+
+            ret_val = True
+
+        return ret_val
 
     # ////////////////////// Helpers ////////////////////// #
 
@@ -264,8 +295,8 @@ def main(host, username, verbose=False):
         This is currently only used for testing.
     """
     ssh = ssh_agent(host=host, username=username, verbose=verbose)
-    ssh.list_directory(args="-al")
-    ssh.run_python("Desktop/hello.py", sudo=True)
+    print(ssh.file_exists_on_server(file_path="/home"))
+    ssh._run_command(command="sudo mkdir /opt/repos/test", get_pty=False)
     del ssh
 
 if __name__ == "__main__":
