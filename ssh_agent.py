@@ -1,6 +1,9 @@
 """
+    Created by Justin Marion 2021.
+
     This python file holds the ssh_agent used to connect and run commands via ssh to a given server.
-    Its main() is currently mainly used fo testing during development of the ssh_agent class.
+    Its main() is currently mainly used fo testing during development of the ssh_agent class. This class is a big part
+    of the ssh_deployer as this is what is being used to communicate with the server.
 """
 
 import argparse
@@ -36,10 +39,13 @@ class ssh_agent():
         print()
 
     def __del__(self):
-        # Closes connection with SSh Server
+
+        # Closes SFTP connection
         if self.verbose: print("\nClosing SFTP Connection")
         self.sftp.close()
         if self.verbose: print("Closed")
+
+        # Closed connection with the SSH server
         if self.verbose: print("\nClosing SHH Connection")
         self.ssh.close()
         if self.verbose: print("Connection to {} closed.".format(self.host))
@@ -49,10 +55,13 @@ class ssh_agent():
             This method will print in real time the contents of stdout. This method will not finish until EOF is reached
             in stdout. If stdout is empty a warning will be printed.
         """
+
         # Used to determine if stdout is empty
         stdout_empty = True
+
         # readline will will return until "\n" but will not finish iterating until EOF
         for line in iter(self.streams["out"].readline, ""):
+
             # Print a line and define stdout as not empty
             self._host_print(line, end="")
             stdout_empty = False
@@ -67,14 +76,18 @@ class ssh_agent():
         """
             This method will print the contents of stderr. If stderr is printed a warning will be printed.
         """
+
         # Read lines until EOF
         stderr = self.streams["err"].readlines()
 
         # If there is something print print stderr, else warn that stderr is empty
         if stderr:
+
             for line in stderr:
                 self._host_print(line, end="")
+
         else:
+
             print("!!! WARNING: stderr is empty !!!")
 
         print()
@@ -88,6 +101,7 @@ class ssh_agent():
             :param str directory_path: The path to the directory to list.
             :param str args: Desired arguments to the ls command.
         """
+
         if self.verbose: print("========== List directory ==========")
         self._run_command("ls {} {}".format(args, directory_path))
         self.print_stdout()
@@ -101,6 +115,7 @@ class ssh_agent():
             :param bool print_stdout: Print the programs output.
             :param bool sudo: Run as sudo.
         """
+
         if self.verbose: print("========== Running python ==========")
 
         if sudo:
@@ -109,6 +124,7 @@ class ssh_agent():
             self._run_command("python3 {} {}".format(path_to_python, args))
 
         if print_stdout:
+
             self.print_stdout()
 
             # Print exit status
@@ -119,48 +135,69 @@ class ssh_agent():
 
     def get_server_directory_structure(self, directory):
         """
-        Todo
-        :param directory:
-        :return:
+        This method will use the sftp connection to list the server directory and populate a directory structure of the
+        repo. The structure of the repo will be denoted by a dictionary with each key being the name of an element in
+        the repo. The value to each element will either be an integer representing the file size of element, or a
+        dictionary representing the directory of the element. Therefore checking the type of the value of a key in
+        repo structure will let you know whether the element is either a directory or a file. If while going through the
+        repo, an element is a part of the ignored files list, it is skipped and will not appear in the returned structure.
+
+        example_repo_structure = {
+            "foo": 42,
+            "bar": { ... }
+        }
+
+        :param str directory: The path to the server directory/repo.
+
+        :return: The structure of the repo in type dictionary.
         """
+
         ret_val = {}
 
-        for element in self.sftp.listdir_attr(directory):
+        # Iterate through all elements in the server repo
+        directory_scan = self.sftp.listdir_attr(directory)
+        for element in directory_scan:
+
             element_name = element.filename
+
+            # If the elemnt is a directory we recursively call this method to get the structure of the directory
             if stat.S_ISDIR(element.st_mode):
+
                 ret_val[element_name] = self.get_server_directory_structure(directory="{}/{}".format(directory, element_name))
+
+            # If the element is a file, we set the element's value to the file size
             elif stat.S_ISREG(element.st_mode):
+
                 ret_val[element_name] = element.st_size
+
             else:
+
                 print("!!! ERROR: Did not recognize [{}] element type in directory: [{}] !!!".format(element_name, directory))
 
         return ret_val
 
     def copy_file_to_server(self, local_file, server_path):
         """
-        Todo
-        :param local_file:
-        :param server_path:
-        :return:
+        This method will use the put() method to copy a file over to the ssh server from the local machine.
+
+        :param str local_file: The local path to the file that needs to be copied.
+        :param str server_path: The server path to the local to copy the local file.
+
         """
+
         if self.verbose: print("\tCopying {} to {}".format(local_file, server_path))
         file_name = os.path.split(local_file)[1]
         self.sftp.put(local_file, "/tmp/{}".format(file_name))
         self._run_command("sudo mv /tmp/{} {}/".format(file_name, server_path), get_pty=False)
-        # Todo temp fix for waiting to copy
-        # time.sleep(0.1)
 
     def delete_file_from_server(self, file_path):
         """
-        Todo
-        :param file_path:
-        :return:
+        This method will delete a file in the ssh server.
+
+        :param str file_path: The path to the file that needs to be deleted
         """
         if self.verbose: print("\tDeleting {}".format(file_path))
         self._run_command("sudo rm -rf {}".format(file_path), get_pty=False)
-        # Todo temp fix for waiting to del
-        # time.sleep(0.1)
-
 
     # ////////////////////// Helpers ////////////////////// #
 
@@ -171,6 +208,7 @@ class ssh_agent():
 
             :param str command: Command to run
         """
+
         stdin, stdout, stderr = self.ssh.exec_command(command, get_pty=get_pty)
         self.streams["in"] = stdin
         self.streams["out"] = stdout
@@ -181,25 +219,33 @@ class ssh_agent():
             This method will connect to an ssh server given its class variables instantiated int the init method.
             If an error occurs during connection, a message is printed.
         """
+
         try:
+
             if self.verbose: print("\nSSH Connecting to: Host-{}, Username-{}".format(self.host, self.username))
             self.ssh = paramiko.SSHClient()
             self.ssh.load_system_host_keys()
             self.ssh.connect(hostname=self.host, username=self.username)
             if self.verbose: print("Connected")
+
         except Exception as e:
+
             print("!!! ERROR: Unable to SSH connect; error message: [{}] !!!".format(e))
 
     def _ssh_sftp_connect(self):
         """
-        Todo
-        :return:
+        This method will use the open_sftp() method to establish an SFTP connection with the ssh server
+
         """
+
         try:
+
             if self.verbose: print("\nSFTP Connecting")
             self.sftp = self.ssh.open_sftp()
             if self.verbose: print("Connected")
+
         except Exception as e:
+
             print("!!! ERROR: Unable to create an sftp connection; error message [{}] !!!".format(e))
 
     def _host_print(self, msg, end="\n"):
@@ -210,6 +256,7 @@ class ssh_agent():
             :param str msg: Message to print
             :param str end: Parameter to pass to print()
         """
+
         print("{}: {}".format(self.host, msg), end=end)
 
 def main(host, username, verbose=False):
