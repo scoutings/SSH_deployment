@@ -185,7 +185,7 @@ class ssh_agent():
 
         """
 
-        if self.verbose: print("\tCopying {} to {}".format(local_file, server_path))
+        if self.verbose: print("\tCopying {} to {}/".format(local_file, server_path))
 
         server_path_exists = self.file_exists_on_server(file_path=server_path)
 

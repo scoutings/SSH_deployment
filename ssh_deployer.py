@@ -273,12 +273,13 @@ class ssh_deployer():
             element_name = element.name
 
             # If the name is not a a part of the ignored files list we check the structure
-            if element_name not in self.ignore_files:
+            element_path = os.path.abspath(directory_path + element_name)
+            if element_path not in self.ignore_files:
 
                 # If the element is a directory we recursively call this method to get the structure of the directory
                 if element.is_dir():
 
-                    ret_val[element_name] = self._get_local_directory_structure(directory_path="{}/{}".format(directory_path, element_name))
+                    ret_val[element_name] = self._get_local_directory_structure(directory_path="{}{}/".format(directory_path, element_name))
 
                 # If the element is a file, we set the element's value to the file size
                 elif element.is_file():
@@ -326,6 +327,7 @@ class ssh_deployer():
                 if self.verbose: print("\t{}: {}".format(SERVER_REPO_PATH_CFG_KEY, self.deployment_server))
 
                 self.ignore_files = init_json[DEPLOYMENT_CFG_GROUP][IGNORED_FILES_CFG_KEY]
+                self.ignore_files = [os.path.abspath(self.deployment_local + "/" + ignore_file) for ignore_file in self.ignore_files]
                 if self.verbose: print("\t{}: {}".format(IGNORED_FILES_CFG_KEY, self.ignore_files))
 
                 ret_val = True
