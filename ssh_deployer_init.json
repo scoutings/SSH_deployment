@@ -6,6 +6,6 @@
   "Deployment": {
     "Local Repo Path": "",
     "Server Repo Path": "",
-    "Ignored Files": []
+    "Ignored Files": [".git"]
   }
 }
