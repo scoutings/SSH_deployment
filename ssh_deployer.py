@@ -74,24 +74,27 @@ class ssh_deployer():
 
     def run(self):
         """
-        This is the main method that will run in permanence until told to shutdown. The work flow od this method is to
-        first check the structure of both repos local and on the server. It will instantly compare the two structures.
-        If the two differ the method will use some logic to find out the actions needed to take on the repo deployed
-        on the server to make the two structure similar.
+            This is the main method that will run in permanence until told to shutdown. The work flow od this method is to
+            first check the structure of both repos local and on the server. It will instantly compare the two structures.
+            If the two differ the method will use some logic to find out the actions needed to take on the repo deployed
+            on the server to make the two structure similar.
         """
 
         last_repo_update = datetime.datetime.now()
 
         while True:
 
+            self._loop_print(message="+---------- Start of loop ----------+")
+
             # Check the structures of each repo
             scan_local_repo = self._get_local_directory_structure(directory_path=self.deployment_local)
             scan_server_repo = self.ssh_agent.get_server_directory_structure(self.deployment_server)
 
+            self._loop_print(message="Server repo structure:")
+            print(json.dumps(scan_server_repo, indent=4))
+
             # If they differ -> investigate
             if scan_local_repo != scan_server_repo:
-
-                print(); print("=== Diff Detected ===")
 
                 # Get all actions needed to be done on the server repo.
                 files_to_copy = self._get_copy_actions_from_diff(local_tree=scan_local_repo, server_tree=scan_server_repo)
@@ -106,24 +109,23 @@ class ssh_deployer():
                     server_file = self.deployment_server + file
                     self.ssh_agent.delete_file_from_server(file_path=server_file)
 
-                last_repo_update = datetime.datetime.now()
-
             else:
-                print(".", end="")
+                self._loop_print(message="Repos match -> no actions needed")
 
-            time_since_update = datetime.datetime.now() - last_repo_update
-            time_to_sleep = .5 if time_since_update.total_seconds() < 5 else 3
-            time.sleep(time_to_sleep)
+            self._loop_print(message="Sleeping...")
+            time.sleep(3)
+
+            self._loop_print(message="+---------- End of loop ----------+")
 
     # ////////////////////// Helpers ////////////////////// #
 
     def _get_all_directory_paths(self, directory_tree):
         """
-        This method takes in a directory structure and returns the path to each file in the directory as list of strings.
+            This method takes in a directory structure and returns the path to each file in the directory as list of strings.
 
-        :param dict directory_tree: This is a directory structure in a dictionary.
+            :param dict directory_tree: This is a directory structure in a dictionary.
 
-        :return: A list of all paths to each file in the dictionary.
+            :return: A list of all paths to each file in the dictionary.
         """
         ret_val = []
 
@@ -146,17 +148,17 @@ class ssh_deployer():
 
     def _get_copy_actions_from_diff(self, local_tree, server_tree, ):
         """
-        This method will go through each file in the local repo and check to see if the same file exists in the server
-        repo. It will the use the logic below to determine and return a list of files to copy over to the server repo.
+            This method will go through each file in the local repo and check to see if the same file exists in the server
+            repo. It will the use the logic below to determine and return a list of files to copy over to the server repo.
 
-            If the server does not have the file -> file needs to be copied to the server.
-            If the server has the file but they differ -> file needs to be copied to the sever.
-            If the server has the file and the are the same -> no action.
+                If the server does not have the file -> file needs to be copied to the server.
+                If the server has the file but they differ -> file needs to be copied to the sever.
+                If the server has the file and the are the same -> no action.
 
-        :param dict local_tree: The repo structure of the repo on the local machine.
-        :param server_tree: The repo structure of the repo on the server machine.
+            :param dict local_tree: The repo structure of the repo on the local machine.
+            :param server_tree: The repo structure of the repo on the server machine.
 
-        :return: A list of files needed to be copied on the server machine.
+            :return: A list of files needed to be copied on the server machine.
         """
 
         ret_val = []
@@ -210,17 +212,17 @@ class ssh_deployer():
 
     def _get_delete_actions_from_diff(self, local_tree, server_tree):
         """
-        This method will go through each elements in the server repo structure and will compare with the local repo
-        structure. It will use some logic to determine what files need to be deleted from the server repo in order to
-        keep both structures consistent.
+            This method will go through each elements in the server repo structure and will compare with the local repo
+            structure. It will use some logic to determine what files need to be deleted from the server repo in order to
+            keep both structures consistent.
 
-            If the element in the server does not exist in the local repo -> element needs to the deleted from the server
-            If the element is a directory -> recursively call the method to find any files needed to be deleted
+                If the element in the server does not exist in the local repo -> element needs to the deleted from the server
+                If the element is a directory -> recursively call the method to find any files needed to be deleted
 
-        :param dict local_tree: The repo structure of the repo on the local machine.
-        :param dict server_tree: The repo structure of the repo on the server machine.
+            :param dict local_tree: The repo structure of the repo on the local machine.
+            :param dict server_tree: The repo structure of the repo on the server machine.
 
-        :return: A list of files/directories needed to be deleted on the serer machine.
+            :return: A list of files/directories needed to be deleted on the serer machine.
         """
         ret_val = []
 
@@ -247,21 +249,21 @@ class ssh_deployer():
 
     def _get_local_directory_structure(self, directory_path):
         """
-        This method will use the os library to scan the local directory and populate a directory structure of the local
-        repo. The structure of the repo will be denoted by a dictionary with each key being the name of an element in
-        the repo. The value to each element will either be an integer representing the file size of element, or a
-        dictionary representing the directory of the element. Therefore checking the type of the value of a key in
-        repo structure will let you know whether the element is either a directory or a file. If while going through the
-        repo, an element is a part of the ignored files list, it is skipped and will not appear in the returned structure.
+            This method will use the os library to scan the local directory and populate a directory structure of the local
+            repo. The structure of the repo will be denoted by a dictionary with each key being the name of an element in
+            the repo. The value to each element will either be an integer representing the file size of element, or a
+            dictionary representing the directory of the element. Therefore checking the type of the value of a key in
+            repo structure will let you know whether the element is either a directory or a file. If while going through the
+            repo, an element is a part of the ignored files list, it is skipped and will not appear in the returned structure.
 
-        example_repo_structure = {
-            "foo": 42,
-            "bar": { ... }
-        }
+            example_repo_structure = {
+                "foo": 42,
+                "bar": { ... }
+            }
 
-        :param str directory: The path to the local directory/repo.
+            :param str directory: The path to the local directory/repo.
 
-        :return: The structure of the repo in type dictionary.
+            :return: The structure of the repo in type dictionary.
         """
 
         ret_val = {}
@@ -279,7 +281,8 @@ class ssh_deployer():
                 # If the element is a directory we recursively call this method to get the structure of the directory
                 if element.is_dir():
 
-                    ret_val[element_name] = self._get_local_directory_structure(directory_path="{}{}/".format(directory_path, element_name))
+                    dir_full_path =  os.path.abspath("{}/{}".format(directory_path, element_name))
+                    ret_val[element_name] = self._get_local_directory_structure(directory_path=dir_full_path)
 
                 # If the element is a file, we set the element's value to the file size
                 elif element.is_file():
@@ -321,9 +324,11 @@ class ssh_deployer():
                 if self.verbose: print("\t{}: {}".format(USER_CFG_KEY, self.ssh_user))
 
                 self.deployment_local = init_json[DEPLOYMENT_CFG_GROUP][LOCAL_REPO_PATH_CFG_KEY]
+                self.deployment_local = os.path.abspath(self.deployment_local) + "/"
                 if self.verbose: print("\t{}: {}".format(LOCAL_REPO_PATH_CFG_KEY, self.deployment_local))
 
                 self.deployment_server = init_json[DEPLOYMENT_CFG_GROUP][SERVER_REPO_PATH_CFG_KEY]
+                self.deployment_server = os.path.abspath(self.deployment_server) + "/"
                 if self.verbose: print("\t{}: {}".format(SERVER_REPO_PATH_CFG_KEY, self.deployment_server))
 
                 self.ignore_files = init_json[DEPLOYMENT_CFG_GROUP][IGNORED_FILES_CFG_KEY]
@@ -342,6 +347,16 @@ class ssh_deployer():
 
         return ret_val
 
+    def _loop_print(self, message):
+        """
+            This method is a simple wrapper around print that will add a time stamp to the front of the message.
+
+            :param message: Message to print.
+
+        """
+        current_time = datetime.datetime.now()
+        current_timestamp = current_time.strftime("%Y/%m/%d/%H/%M/%S")
+        print("{}: {}".format(current_timestamp, message))
 
 def main(cfg_path, verbose=False):
     ssh_dep = ssh_deployer(cfg_path=cfg_path, verbose=verbose)

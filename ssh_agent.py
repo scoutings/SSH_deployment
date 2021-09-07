@@ -7,7 +7,6 @@
 """
 
 import argparse
-import time
 import paramiko
 import os
 import stat
@@ -135,21 +134,21 @@ class ssh_agent():
 
     def get_server_directory_structure(self, directory):
         """
-        This method will use the sftp connection to list the server directory and populate a directory structure of the
-        repo. The structure of the repo will be denoted by a dictionary with each key being the name of an element in
-        the repo. The value to each element will either be an integer representing the file size of element, or a
-        dictionary representing the directory of the element. Therefore checking the type of the value of a key in
-        repo structure will let you know whether the element is either a directory or a file. If while going through the
-        repo, an element is a part of the ignored files list, it is skipped and will not appear in the returned structure.
+            This method will use the sftp connection to list the server directory and populate a directory structure of the
+            repo. The structure of the repo will be denoted by a dictionary with each key being the name of an element in
+            the repo. The value to each element will either be an integer representing the file size of element, or a
+            dictionary representing the directory of the element. Therefore checking the type of the value of a key in
+            repo structure will let you know whether the element is either a directory or a file. If while going through the
+            repo, an element is a part of the ignored files list, it is skipped and will not appear in the returned structure.
 
-        example_repo_structure = {
-            "foo": 42,
-            "bar": { ... }
-        }
+            example_repo_structure = {
+                "foo": 42,
+                "bar": { ... }
+            }
 
-        :param str directory: The path to the server directory/repo.
+            :param str directory: The path to the server directory/repo.
 
-        :return: The structure of the repo in type dictionary.
+            :return: The structure of the repo in type dictionary.
         """
 
         ret_val = {}
@@ -178,14 +177,14 @@ class ssh_agent():
 
     def copy_file_to_server(self, local_file, server_path):
         """
-        This method will use the put() method to copy a file over to the ssh server from the local machine.
+            This method will use the put() method to copy a file over to the ssh server from the local machine.
 
-        :param str local_file: The local path to the file that needs to be copied.
-        :param str server_path: The server path to the local to copy the local file.
+            :param str local_file: The local path to the file that needs to be copied.
+            :param str server_path: The server path to the local to copy the local file.
 
         """
 
-        if self.verbose: print("\tCopying {} to {}/".format(local_file, server_path))
+        if self.verbose: print("Copying {} to {}/".format(local_file, server_path))
 
         server_path_exists = self.file_exists_on_server(file_path=server_path)
 
@@ -198,20 +197,20 @@ class ssh_agent():
 
     def delete_file_from_server(self, file_path):
         """
-        This method will delete a file in the ssh server.
+            This method will delete a file in the ssh server.
 
-        :param str file_path: The path to the file that needs to be deleted
+            :param str file_path: The path to the file that needs to be deleted
         """
-        if self.verbose: print("\tDeleting {}".format(file_path))
+        if self.verbose: print("Deleting {}".format(file_path))
         self._run_command("sudo rm -rf {}".format(file_path), get_pty=False)
 
     def file_exists_on_server(self, file_path):
         """
-        This method will check if the fle path given as a parameter exists on the ssh server. It will return T/F.
+            This method will check if the fle path given as a parameter exists on the ssh server. It will return T/F.
 
-        :param str file_path: The path to determine if it exists or not.
+            :param str file_path: The path to determine if it exists or not.
 
-        :return: T/F based on if the path exists or not.
+            :return: T/F based on if the path exists or not.
         """
 
         ret_val = None
@@ -265,7 +264,7 @@ class ssh_agent():
 
     def _ssh_sftp_connect(self):
         """
-        This method will use the open_sftp() method to establish an SFTP connection with the ssh server
+            This method will use the open_sftp() method to establish an SFTP connection with the ssh server
 
         """
 
