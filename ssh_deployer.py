@@ -36,6 +36,11 @@ LOCAL_REPO_PATH_CFG_KEY = "Local Repo Path"
 SERVER_REPO_PATH_CFG_KEY = "Server Repo Path"
 IGNORED_FILES_CFG_KEY = "Ignored Files"
 
+CONFIG_CFG_GROUP = "Config"
+PAUSE_CFG_KEY = "Pause"
+SHUTDOWN_CFG_KEY = "Shutdown"
+LOOP_DELAY_CFG_KEY = "Loop Delay"
+
 CFG_FILE_VALIDATION = Schema({
     SSH_CONNECTION_CFG_GROUP: {
         HOST_CFG_KEY: str,
@@ -45,6 +50,11 @@ CFG_FILE_VALIDATION = Schema({
         LOCAL_REPO_PATH_CFG_KEY: str,
         SERVER_REPO_PATH_CFG_KEY: str,
         IGNORED_FILES_CFG_KEY: list
+    },
+    CONFIG_CFG_GROUP: {
+        PAUSE_CFG_KEY: bool,
+        SHUTDOWN_CFG_KEY: bool,
+        LOOP_DELAY_CFG_KEY: int
     }
 })
 
@@ -57,13 +67,14 @@ class ssh_deployer():
     def __init__(self, cfg_path, verbose=False):
 
         self.verbose = verbose
+        self.cfg_path = cfg_path
 
         self.ssh_host = None
         self.ssh_user = None
         self.deployment_local = None
         self.deployment_server = None
         self.ignore_files = None
-        self._parse_init_json(init_json_path=cfg_path)
+        self._parse_init_json(init_json_path=self.cfg_path)
 
         self.ssh_agent = ssh_agent(host=self.ssh_host, username=self.ssh_user, verbose=self.verbose)
 
@@ -86,34 +97,49 @@ class ssh_deployer():
 
             self._loop_print(message="+---------- Start of loop ----------+")
 
-            # Check the structures of each repo
-            scan_local_repo = self._get_local_directory_structure(directory_path=self.deployment_local)
-            scan_server_repo = self.ssh_agent.get_server_directory_structure(self.deployment_server)
+            pause, shutdown, loop_delay = self._parse_cfg_from_init_json(self.cfg_path)
 
-            self._loop_print(message="Server repo structure:")
-            print(json.dumps(scan_server_repo, indent=4))
+            if shutdown:
 
-            # If they differ -> investigate
-            if scan_local_repo != scan_server_repo:
+                if self.verbose: self._loop_print("Deployer shutting down")
 
-                # Get all actions needed to be done on the server repo.
-                files_to_copy = self._get_copy_actions_from_diff(local_tree=scan_local_repo, server_tree=scan_server_repo)
-                files_to_del = self._get_delete_actions_from_diff(local_tree=scan_local_repo, server_tree=scan_server_repo)
+                return
 
-                for file in files_to_copy:
-                    local_file = self.deployment_local + file
-                    server_dir = os.path.dirname(self.deployment_server + file)
-                    self.ssh_agent.copy_file_to_server(local_file=local_file, server_path=server_dir)
+            elif pause:
 
-                for file in files_to_del:
-                    server_file = self.deployment_server + file
-                    self.ssh_agent.delete_file_from_server(file_path=server_file)
+                if self.verbose: self._loop_print("Deployer is paused")
+
+                pass
 
             else:
-                self._loop_print(message="Repos match -> no actions needed")
+                # Check the structures of each repo
+                scan_local_repo = self._get_local_directory_structure(directory_path=self.deployment_local)
+                scan_server_repo = self.ssh_agent.get_server_directory_structure(self.deployment_server)
 
-            self._loop_print(message="Sleeping...")
-            time.sleep(3)
+                self._loop_print(message="Server repo structure:")
+                print(json.dumps(scan_server_repo, indent=4))
+
+                # If they differ -> investigate
+                if scan_local_repo != scan_server_repo:
+
+                    # Get all actions needed to be done on the server repo.
+                    files_to_copy = self._get_copy_actions_from_diff(local_tree=scan_local_repo, server_tree=scan_server_repo)
+                    files_to_del = self._get_delete_actions_from_diff(local_tree=scan_local_repo, server_tree=scan_server_repo)
+
+                    for file in files_to_copy:
+                        local_file = self.deployment_local + file
+                        server_dir = os.path.dirname(self.deployment_server + file)
+                        self.ssh_agent.copy_file_to_server(local_file=local_file, server_path=server_dir)
+
+                    for file in files_to_del:
+                        server_file = self.deployment_server + file
+                        self.ssh_agent.delete_file_from_server(file_path=server_file)
+
+                else:
+                    self._loop_print(message="Repos match -> no actions needed")
+
+            self._loop_print(message="Sleeping {}(s)".format(loop_delay))
+            time.sleep(loop_delay)
 
             self._loop_print(message="+---------- End of loop ----------+")
 
@@ -346,6 +372,49 @@ class ssh_deployer():
             print("!!! ERROR: An error occurred when parsing init file [{}] !!!".format(e))
 
         return ret_val
+
+    def _parse_cfg_from_init_json(self, init_json_path):
+        """
+            This method will use the Schema library to validate the CFG file being passed to the deployer. Once
+            validated the init file will be parsed to store the cfg information in the file.
+
+            :param str init_json_path: Path to the init file to be parsed.
+
+            :return: A triple with the pause value, shutdown value, and loop delay value
+        """
+
+        pause_value = None
+        shutdown_value = None
+        loop_delay_value = None
+
+        if self.verbose: self._loop_print("Getting Config Values:")
+
+        try:
+            init_json_file = open(init_json_path)
+            init_json = json.load(init_json_file)
+
+            try:
+
+                CFG_FILE_VALIDATION.validate(init_json)
+
+                pause_value = init_json[CONFIG_CFG_GROUP][PAUSE_CFG_KEY]
+                if self.verbose: self._loop_print("\t{}: {}".format(PAUSE_CFG_KEY, pause_value))
+
+                shutdown_value = init_json[CONFIG_CFG_GROUP][SHUTDOWN_CFG_KEY]
+                if self.verbose: self._loop_print("\t{}: {}".format(SHUTDOWN_CFG_KEY, shutdown_value))
+
+                loop_delay_value = init_json[CONFIG_CFG_GROUP][LOOP_DELAY_CFG_KEY]
+                if self.verbose: self._loop_print("\t{}: {}".format(LOOP_DELAY_CFG_KEY, loop_delay_value))
+
+            except SchemaError as e:
+                print("!!! ERROR: CFG file not correct format; Schema Error: [{}] !!!".format(e))
+
+            init_json_file.close()
+
+        except Exception as e:
+            print("!!! ERROR: An error occurred when parsing init file [{}] !!!".format(e))
+
+        return (pause_value, shutdown_value, loop_delay_value)
 
     def _loop_print(self, message):
         """

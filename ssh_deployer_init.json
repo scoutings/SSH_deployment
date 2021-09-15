@@ -7,5 +7,10 @@
     "Local Repo Path": "",
     "Server Repo Path": "",
     "Ignored Files": [".git"]
+  },
+  "Config": {
+    "Pause": false,
+    "Shutdown": false,
+    "Loop Delay": 3
   }
 }
