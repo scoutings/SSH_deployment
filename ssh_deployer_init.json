@@ -6,7 +6,8 @@
   "Deployment": {
     "Local Repo Path": "",
     "Server Repo Path": "",
-    "Ignored Files": [".git"]
+    "Ignored Files": [".git"],
+    "Do Not Delete": []
   },
   "Config": {
     "Pause": false,

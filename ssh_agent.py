@@ -132,7 +132,7 @@ class ssh_agent():
 
             print()
 
-    def get_server_directory_structure(self, directory):
+    def get_server_directory_structure(self, directory, do_not_delete):
         """
             This method will use the sftp connection to list the server directory and populate a directory structure of the
             repo. The structure of the repo will be denoted by a dictionary with each key being the name of an element in
@@ -159,19 +159,21 @@ class ssh_agent():
 
             element_name = element.filename
 
-            # If the elemnt is a directory we recursively call this method to get the structure of the directory
-            if stat.S_ISDIR(element.st_mode):
+            if element_name not in do_not_delete:
 
-                ret_val[element_name] = self.get_server_directory_structure(directory="{}/{}".format(directory, element_name))
+                # If the element is a directory we recursively call this method to get the structure of the directory
+                if stat.S_ISDIR(element.st_mode):
 
-            # If the element is a file, we set the element's value to the file size
-            elif stat.S_ISREG(element.st_mode):
+                    ret_val[element_name] = self.get_server_directory_structure(directory="{}/{}".format(directory, element_name), do_not_delete=do_not_delete)
 
-                ret_val[element_name] = element.st_size
+                # If the element is a file, we set the element's value to the file size
+                elif stat.S_ISREG(element.st_mode):
 
-            else:
+                    ret_val[element_name] = element.st_size
 
-                print("!!! ERROR: Did not recognize [{}] element type in directory: [{}] !!!".format(element_name, directory))
+                else:
+
+                    print("!!! ERROR: Did not recognize [{}] element type in directory: [{}] !!!".format(element_name, directory))
 
         return ret_val
 
