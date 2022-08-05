@@ -132,7 +132,7 @@ class ssh_agent():
 
             print()
 
-    def get_server_directory_structure(self, directory):
+    def get_server_directory_structure(self, directory, do_not_delete):
         """
             This method will use the sftp connection to list the server directory and populate a directory structure of the
             repo. The structure of the repo will be denoted by a dictionary with each key being the name of an element in
@@ -159,19 +159,21 @@ class ssh_agent():
 
             element_name = element.filename
 
-            # If the elemnt is a directory we recursively call this method to get the structure of the directory
-            if stat.S_ISDIR(element.st_mode):
+            if element_name not in do_not_delete:
 
-                ret_val[element_name] = self.get_server_directory_structure(directory="{}/{}".format(directory, element_name))
+                # If the element is a directory we recursively call this method to get the structure of the directory
+                if stat.S_ISDIR(element.st_mode):
 
-            # If the element is a file, we set the element's value to the file size
-            elif stat.S_ISREG(element.st_mode):
+                    ret_val[element_name] = self.get_server_directory_structure(directory="{}/{}".format(directory, element_name), do_not_delete=do_not_delete)
 
-                ret_val[element_name] = element.st_size
+                # If the element is a file, we set the element's value to the file size
+                elif stat.S_ISREG(element.st_mode):
 
-            else:
+                    ret_val[element_name] = element.st_size
 
-                print("!!! ERROR: Did not recognize [{}] element type in directory: [{}] !!!".format(element_name, directory))
+                else:
+
+                    print("!!! ERROR: Did not recognize [{}] element type in directory: [{}] !!!".format(element_name, directory))
 
         return ret_val
 
@@ -189,11 +191,11 @@ class ssh_agent():
         server_path_exists = self.file_exists_on_server(file_path=server_path)
 
         if not server_path_exists:
-            self._run_command(command="sudo mkdir {}".format(server_path), get_pty=False)
+            self._run_command(command="mkdir {}".format(server_path), get_pty=False)
 
         file_name = os.path.split(local_file)[1]
         self.sftp.put(local_file, "/tmp/{}".format(file_name))
-        self._run_command("sudo mv /tmp/{} {}/".format(file_name, server_path), get_pty=False)
+        self._run_command("mv /tmp/{} {}/".format(file_name, server_path), get_pty=True)
 
     def delete_file_from_server(self, file_path):
         """
@@ -202,7 +204,7 @@ class ssh_agent():
             :param str file_path: The path to the file that needs to be deleted
         """
         if self.verbose: print("Deleting {}".format(file_path))
-        self._run_command("sudo rm -rf {}".format(file_path), get_pty=False)
+        self._run_command("rm -rf {}".format(file_path), get_pty=True)
 
     def file_exists_on_server(self, file_path):
         """
@@ -255,7 +257,7 @@ class ssh_agent():
             if self.verbose: print("\nSSH Connecting to: Host-{}, Username-{}".format(self.host, self.username))
             self.ssh = paramiko.SSHClient()
             self.ssh.load_system_host_keys()
-            self.ssh.connect(hostname=self.host, username=self.username)
+            self.ssh.connect(hostname=self.host, username=self.username, password="")
             if self.verbose: print("Connected")
 
         except Exception as e:
@@ -295,7 +297,7 @@ def main(host, username, verbose=False):
     """
     ssh = ssh_agent(host=host, username=username, verbose=verbose)
     print(ssh.file_exists_on_server(file_path="/home"))
-    ssh._run_command(command="sudo mkdir /opt/repos/test", get_pty=False)
+    ssh._run_command(command="mkdir /opt/repos/test", get_pty=False)
     del ssh
 
 if __name__ == "__main__":

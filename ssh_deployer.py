@@ -35,6 +35,7 @@ DEPLOYMENT_CFG_GROUP = "Deployment"
 LOCAL_REPO_PATH_CFG_KEY = "Local Repo Path"
 SERVER_REPO_PATH_CFG_KEY = "Server Repo Path"
 IGNORED_FILES_CFG_KEY = "Ignored Files"
+DO_NOT_DELETE_CFG_KEY = "Do Not Delete"
 
 CONFIG_CFG_GROUP = "Config"
 PAUSE_CFG_KEY = "Pause"
@@ -49,7 +50,8 @@ CFG_FILE_VALIDATION = Schema({
     DEPLOYMENT_CFG_GROUP: {
         LOCAL_REPO_PATH_CFG_KEY: str,
         SERVER_REPO_PATH_CFG_KEY: str,
-        IGNORED_FILES_CFG_KEY: list
+        IGNORED_FILES_CFG_KEY: list,
+        DO_NOT_DELETE_CFG_KEY: list
     },
     CONFIG_CFG_GROUP: {
         PAUSE_CFG_KEY: bool,
@@ -74,6 +76,7 @@ class ssh_deployer():
         self.deployment_local = None
         self.deployment_server = None
         self.ignore_files = None
+        self.do_not_delete = None
         self._parse_init_json(init_json_path=self.cfg_path)
 
         self.ssh_agent = ssh_agent(host=self.ssh_host, username=self.ssh_user, verbose=self.verbose)
@@ -114,7 +117,7 @@ class ssh_deployer():
             else:
                 # Check the structures of each repo
                 scan_local_repo = self._get_local_directory_structure(directory_path=self.deployment_local)
-                scan_server_repo = self.ssh_agent.get_server_directory_structure(self.deployment_server)
+                scan_server_repo = self.ssh_agent.get_server_directory_structure(self.deployment_server, do_not_delete=self.do_not_delete)
 
                 self._loop_print(message="Server repo structure:")
                 print(json.dumps(scan_server_repo, indent=4))
@@ -360,6 +363,9 @@ class ssh_deployer():
                 self.ignore_files = init_json[DEPLOYMENT_CFG_GROUP][IGNORED_FILES_CFG_KEY]
                 self.ignore_files = [os.path.abspath(self.deployment_local + "/" + ignore_file) for ignore_file in self.ignore_files]
                 if self.verbose: print("\t{}: {}".format(IGNORED_FILES_CFG_KEY, self.ignore_files))
+
+                self.do_not_delete = init_json[DEPLOYMENT_CFG_GROUP][DO_NOT_DELETE_CFG_KEY]
+                if self.verbose: print("\t{}: {}".format(DO_NOT_DELETE_CFG_KEY, self.do_not_delete))
 
                 ret_val = True
 
