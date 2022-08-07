@@ -1,11 +1,11 @@
 {
   "SSH Connection": {
-    "Host": "",
-    "User": ""
+    "Host": "192.168.0.189",
+    "User": "justin"
   },
   "Deployment": {
-    "Local Repo Path": "",
-    "Server Repo Path": "",
+    "Local Repo Path": "/Users/justinmarion/repos/SSH_deployment",
+    "Server Repo Path": "/home/justin/deployer_repos/ssh_deployer",
     "Ignored Files": [".git"],
     "Do Not Delete": []
   },

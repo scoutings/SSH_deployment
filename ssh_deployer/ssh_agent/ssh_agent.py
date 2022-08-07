@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 """
     Created by Justin Marion 2021.
 
@@ -11,7 +13,7 @@ import paramiko
 import os
 import stat
 
-class ssh_agent():
+class SSHAgent():
     """
         This is the ssh_agent class. It is used to send commands to a given server via ssh.
     """
@@ -39,98 +41,15 @@ class ssh_agent():
 
     def __del__(self):
 
-        # Closes SFTP connection
-        if self.verbose: print("\nClosing SFTP Connection")
-        self.sftp.close()
-        if self.verbose: print("Closed")
-
         # Closed connection with the SSH server
         if self.verbose: print("\nClosing SHH Connection")
         self.ssh.close()
         if self.verbose: print("Connection to {} closed.".format(self.host))
 
-    def print_stdout(self):
-        """
-            This method will print in real time the contents of stdout. This method will not finish until EOF is reached
-            in stdout. If stdout is empty a warning will be printed.
-        """
-
-        # Used to determine if stdout is empty
-        stdout_empty = True
-
-        # readline will will return until "\n" but will not finish iterating until EOF
-        for line in iter(self.streams["out"].readline, ""):
-
-            # Print a line and define stdout as not empty
-            self._host_print(line, end="")
-            stdout_empty = False
-
-        # If stdout is empty then print warning
-        if stdout_empty == True:
-            print("!!! WARNING: stdout is empty !!!")
-
-        print()
-
-    def print_stderr(self):
-        """
-            This method will print the contents of stderr. If stderr is printed a warning will be printed.
-        """
-
-        # Read lines until EOF
-        stderr = self.streams["err"].readlines()
-
-        # If there is something print print stderr, else warn that stderr is empty
-        if stderr:
-
-            for line in stderr:
-                self._host_print(line, end="")
-
-        else:
-
-            print("!!! WARNING: stderr is empty !!!")
-
-        print()
-
-    # ////////////////////// Commands ////////////////////// #
-
-    def list_directory(self, directory_path="", args=""):
-        """
-            This method runs the ls command through ssh on the connected server.
-
-            :param str directory_path: The path to the directory to list.
-            :param str args: Desired arguments to the ls command.
-        """
-
-        if self.verbose: print("========== List directory ==========")
-        self._run_command("ls {} {}".format(args, directory_path))
-        self.print_stdout()
-
-    def run_python(self, path_to_python, args="", print_stdout=True, sudo=False):
-        """
-            This method runs a python file through ssh on the connected server.
-
-            :param str path_to_python: Path to the python file to be ran.
-            :param str args: Arguments to the python file when ran if any. Format is same as in shell.
-            :param bool print_stdout: Print the programs output.
-            :param bool sudo: Run as sudo.
-        """
-
-        if self.verbose: print("========== Running python ==========")
-
-        if sudo:
-            self._run_command("sudo python3 {} {}".format(path_to_python, args))
-        else:
-            self._run_command("python3 {} {}".format(path_to_python, args))
-
-        if print_stdout:
-
-            self.print_stdout()
-
-            # Print exit status
-            exit_status = self.streams["out"].channel.recv_exit_status()
-            self._host_print("Process finished with exit code {}".format(exit_status))
-
-            print()
+        # Closes SFTP connection
+        if self.verbose: print("\nClosing SFTP Connection")
+        self.sftp.close()
+        if self.verbose: print("Closed")
 
     def get_server_directory_structure(self, directory, do_not_delete):
         """
@@ -184,6 +103,8 @@ class ssh_agent():
             :param str local_file: The local path to the file that needs to be copied.
             :param str server_path: The server path to the local to copy the local file.
 
+            Todo remove the tmp file location as I do not wantt o support sudo right now
+
         """
 
         if self.verbose: print("Copying {} to {}/".format(local_file, server_path))
@@ -191,7 +112,7 @@ class ssh_agent():
         server_path_exists = self.file_exists_on_server(file_path=server_path)
 
         if not server_path_exists:
-            self._run_command(command="mkdir {}".format(server_path), get_pty=False)
+            self._run_command(command="mkdir {}".format(server_path))
 
         file_name = os.path.split(local_file)[1]
         self.sftp.put(local_file, "/tmp/{}".format(file_name))
@@ -216,24 +137,20 @@ class ssh_agent():
         """
 
         ret_val = None
-
         try:
-
             self.sftp.stat(file_path)
 
         except IOError as e:
-
             ret_val = False
 
         else:
-
             ret_val = True
 
         return ret_val
 
     # ////////////////////// Helpers ////////////////////// #
 
-    def _run_command(self, command, get_pty=True):
+    def _run_command(self, command, get_pty=False):
         """
             This is a simple wrapper method around exec_command() that stores stdin, stdout, and stderr in the streams
             class variable.
@@ -252,17 +169,11 @@ class ssh_agent():
             If an error occurs during connection, a message is printed.
         """
 
-        try:
-
-            if self.verbose: print("\nSSH Connecting to: Host-{}, Username-{}".format(self.host, self.username))
-            self.ssh = paramiko.SSHClient()
-            self.ssh.load_system_host_keys()
-            self.ssh.connect(hostname=self.host, username=self.username, password="")
-            if self.verbose: print("Connected")
-
-        except Exception as e:
-
-            print("!!! ERROR: Unable to SSH connect; error message: [{}] !!!".format(e))
+        if self.verbose: print("\nSSH Connecting to: Host-{}, Username-{}".format(self.host, self.username))
+        self.ssh = paramiko.SSHClient()
+        self.ssh.load_system_host_keys()
+        self.ssh.connect(hostname=self.host, username=self.username, password="")
+        if self.verbose: print("Connected")
 
     def _ssh_sftp_connect(self):
         """
@@ -270,34 +181,17 @@ class ssh_agent():
 
         """
 
-        try:
-
-            if self.verbose: print("\nSFTP Connecting")
-            self.sftp = self.ssh.open_sftp()
-            if self.verbose: print("Connected")
-
-        except Exception as e:
-
-            print("!!! ERROR: Unable to create an sftp connection; error message [{}] !!!".format(e))
-
-    def _host_print(self, msg, end="\n"):
-        """
-            This is a simple helper message used to print a message from the ssh server. The output will clarify that
-            the output is from the ssh server host.
-
-            :param str msg: Message to print
-            :param str end: Parameter to pass to print()
-        """
-
-        print("{}: {}".format(self.host, msg), end=end)
+        if self.verbose: print("\nSFTP Connecting")
+        self.sftp = self.ssh.open_sftp()
+        if self.verbose: print("Connected")
 
 def main(host, username, verbose=False):
     """
         This is currently only used for testing.
     """
-    ssh = ssh_agent(host=host, username=username, verbose=verbose)
-    print(ssh.file_exists_on_server(file_path="/home"))
-    ssh._run_command(command="mkdir /opt/repos/test", get_pty=False)
+    ssh = SSHAgent(host=host, username=username, verbose=verbose)
+    print(ssh.file_exists_on_server(file_path="/home/justin/deployer_repos/"))
+    print(ssh.get_server_directory_structure("/home/justin/deployer_repos/", []))
     del ssh
 
 if __name__ == "__main__":
