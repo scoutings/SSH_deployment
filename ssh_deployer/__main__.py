@@ -26,6 +26,12 @@ def main():
             current_timestamp = current_time.strftime("%Y/%m/%d/%H/%M/%S")
             print(f"{current_timestamp}: {msg}")
 
+    def sigint_handler(signum, frame):
+
+        loop_print("Cleaning up, please wait")
+        global running
+        running = False
+
     signal.signal(signal.SIGINT, sigint_handler)
 
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -277,21 +283,6 @@ def get_all_directory_paths(directory_tree):
             ret_val.append(name)
 
     return ret_val
-
-
-def loop_print(msg, v):
-
-    if v:
-        current_time = datetime.datetime.now()
-        current_timestamp = current_time.strftime("%Y/%m/%d/%H/%M/%S")
-        print(f"{current_timestamp}: {msg}")
-
-
-def sigint_handler(signum, frame):
-
-    print("Cleaning up, please wait")
-    global running
-    running = False
 
 
 if __name__ == "__main__":
