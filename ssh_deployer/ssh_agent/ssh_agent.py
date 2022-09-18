@@ -12,6 +12,7 @@ import argparse
 import paramiko
 import os
 import stat
+import re
 
 class SSHAgent():
     """
@@ -88,7 +89,8 @@ class SSHAgent():
                 # If the element is a file, we set the element's value to the file size
                 elif stat.S_ISREG(element.st_mode):
 
-                    ret_val[element_name] = element.st_size
+                    self._run_command(f"sha1sum {directory}/{element_name}", get_pty=True)
+                    ret_val[element_name] = self._extract_hash(self.streams["out"].readlines()[0])
 
                 else:
 
@@ -159,6 +161,7 @@ class SSHAgent():
         """
 
         stdin, stdout, stderr = self.ssh.exec_command(command, get_pty=get_pty)
+        # print(stdout.readlines())
         self.streams["in"] = stdin
         self.streams["out"] = stdout
         self.streams["err"] = stderr
@@ -184,6 +187,13 @@ class SSHAgent():
         if self.verbose: print("\nSFTP Connecting")
         self.sftp = self.ssh.open_sftp()
         if self.verbose: print("Connected")
+
+    def _extract_hash(self, output):
+        ret_val = None
+        hash = re.findall("[0-9a-f]{5,40}", output)
+        if  len(hash) == 1:
+            ret_val = hash[0]
+        return ret_val
 
 def main(host, username, verbose=False):
     """

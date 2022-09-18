@@ -7,6 +7,7 @@ import time
 import sys
 import json
 import os
+import hashlib
 
 from ssh_deployer.init_file_parser.init_file_parser import InitFileParser
 from ssh_deployer.ssh_agent.ssh_agent import SSHAgent
@@ -144,8 +145,7 @@ def get_local_directory_structure(directory_path, ignore_files):
             # If the element is a file, we set the element's value to the file size
             elif element.is_file():
 
-                element_stat = element.stat()
-                ret_val[element_name] = element_stat.st_size
+                ret_val[element_name] = _hash_file(f"{directory_path}/{element_name}")
 
             # else print the file size is not recognized, this is for debugging.
             else:
@@ -283,6 +283,21 @@ def get_all_directory_paths(directory_tree):
             ret_val.append(name)
 
     return ret_val
+
+def _hash_file(filename):
+
+   # make a hash object
+   h = hashlib.sha1()
+   # open file for reading in binary mode
+   with open(filename,'rb') as file:
+       # loop till the end of the file
+       chunk = 0
+       while chunk != b'':
+           # read only 1024 bytes at a time
+           chunk = file.read(1024)
+           h.update(chunk)
+   # return the hex representation of digest
+   return h.hexdigest()
 
 
 if __name__ == "__main__":
